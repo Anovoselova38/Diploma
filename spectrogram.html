@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Спектрограмма - Digital Oscilloscope DS-2026</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            width: 100%;
+        }
+
+        /* Навигационная панель как в осциллографе */
+        .nav-bar {
+            background: #0a0f1e;
+            border-radius: 20px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-link {
+            padding: 10px 20px;
+            border-radius: 30px;
+            color: #94a3b8;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover {
+            background: #1e293b;
+            color: #e2e8f0;
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .time-display {
+            background: #1e293b;
+            padding: 8px 16px;
+            border-radius: 30px;
+            color: #3b82f6;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            border: 1px solid #3b82f6;
+        }
+
+        /* Главная карточка как в осциллографе */
+        .spectrogram-card {
+            background: #0a0f1e;
+            border-radius: 30px;
+            padding: 25px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            color: #94a3b8;
+        }
+
+        .title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .title h1 {
+            font-size: 24px;
+            font-weight: 400;
+            color: #e2e8f0;
+        }
+
+        .channel-indicators {
+            display: flex;
+            gap: 15px;
+            margin-left: 20px;
+        }
+
+        .channel-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .channel-badge.fft { background: rgba(59, 130, 246, 0.2); color: #3b82f6; border: 1px solid #3b82f6; }
+        .channel-badge.spec { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
+
+        .status {
+            background: #1e293b;
+            padding: 8px 16px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.paused {
+            background: #94a3b8;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Область загрузки в стиле осциллографа */
+        .upload-area {
+            background: #030614;
+            border-radius: 20px;
+            padding: 40px;
+            border: 2px dashed #2d3a4f;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #3b82f6;
+            background: #0a0f1a;
+        }
+
+        .upload-area.dragover {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #3b82f6;
+        }
+
+        .upload-text {
+            color: #e2e8f0;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        /* Информация о файле */
+        .file-info {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .file-info.active {
+            display: grid;
+        }
+
+        .info-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .info-label {
+            color: #94a3b8;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            color: #3b82f6;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Панель вкладок как панель каналов */
+        .analysis-tabs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .analysis-tab {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 15px;
+            border-left: 4px solid #334155;
+            transition: all 0.3s;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .analysis-tab:hover {
+            transform: translateY(-2px);
+            border-left-color: #3b82f6;
+        }
+
+        .analysis-tab.active {
+            border-left-color: #3b82f6;
+            background: #2d3a4f;
+        }
+
+        .tab-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .tab-title.spectrogram { color: #ef4444; }
+        .tab-title.amplitude { color: #4ECDC4; }
+
+        .tab-desc {
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
+        /* Панель параметров как панель scale-panel */
+        .params-panel {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #334155;
+        }
+
+        .params-title {
+            color: #94a3b8;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .param-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .param-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .param-label {
+            color: #94a3b8;
+            font-size: 14px;
+            min-width: 120px;
+        }
+
+        .param-slider {
+            flex: 1;
+            height: 6px;
+            background: #0f172a;
+            border-radius: 3px;
+            -webkit-appearance: none;
+        }
+
+        .param-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .param-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .param-value {
+            color: #3b82f6;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Кнопка генерации как в осциллографе */
+        .generate-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Область результата как scope-container */
+        .result-area {
+            background: #030614;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #2d3a4f;
+            position: relative;
+            margin: 20px 0;
+            min-height: 400px;
+            display: none;
+        }
+
+        .result-area.active {
+            display: block;
+        }
+
+        .spectrogram-image {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            display: block;
+        }
+
+        /* Индикатор загрузки */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #1e293b;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Статистика как measurements */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 15px;
+            border-left: 4px solid;
+        }
+
+        .stat-card.freq { border-color: #FFD700; }
+        .stat-card.amp { border-color: #4ECDC4; }
+        .stat-card.rate { border-color: #3b82f6; }
+        .stat-card.length { border-color: #C084FC; }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            color: #e2e8f0;
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-unit {
+            color: #64748b;
+            font-size: 14px;
+            margin-left: 5px;
+        }
+
+        /* Таблица пиков */
+        .peaks-table {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        .peaks-title {
+            color: #94a3b8;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .peaks-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .peaks-table th {
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #334155;
+        }
+
+        .peaks-table td {
+            color: #e2e8f0;
+            padding: 10px 12px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .peaks-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .peak-freq {
+            color: #FFD700;
+            font-weight: 600;
+        }
+
+        .peak-amp {
+            color: #4ECDC4;
+            font-weight: 600;
+        }
+
+        /* Сообщение об ошибке */
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        /* Лог как в осциллографе */
+        .log-panel {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 20px;
+            margin-top: 25px;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: #94a3b8;
+        }
+
+        .log-container {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 15px;
+            height: 120px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #22c55e;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #334155;
+        }
+
+        .btn-secondary {
+            background: #334155;
+            border: none;
+            color: #e2e8f0;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            background: #4a5a72;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Навигационная панель как в осциллографе -->
+        <div class="nav-bar">
+            <div class="nav-links">
+                <a href="/" class="nav-link">
+                    <span>⚡</span> Осциллограф
+                </a>
+                <a href="/spectrogram" class="nav-link active">
+                    <span>📊</span> Спектрограмма
+                </a>
+            </div>
+            <div class="time-display" id="liveTime">00:00:00</div>
+        </div>
+
+        <!-- Главная карточка -->
+        <div class="spectrogram-card">
+            <div class="header">
+                <div class="title">
+                    <span style="font-size: 32px;">📊</span>
+                    <h1>Spectrum Analyzer <span style="font-size: 14px; color: #3b82f6; margin-left: 10px;"> </span></h1>
+                    
+                </div>
+                <div class="status">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Ожидание файла</span>
+                </div>
+            </div>
+
+            <!-- Область загрузки -->
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Перетащите файл с сигналом или нажмите для выбора</div>
+                <div class="upload-hint">Поддерживаются форматы: CSV, TXT (одно значение на строку)</div>
+                <input type="file" id="fileInput" accept=".csv,.txt" style="display: none;">
+            </div>
+
+            <!-- Информация о файле -->
+            <div class="file-info" id="fileInfo">
+                <div class="info-row">
+                    <span class="info-label">Имя файла</span>
+                    <span class="info-value" id="fileName">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Количество точек</span>
+                    <span class="info-value" id="filePoints">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Длительность</span>
+                    <span class="info-value" id="fileDuration">-</span>
+                </div>
+            </div>
+
+            <!-- Вкладки анализа как панель каналов -->
+            <div class="analysis-tabs">
+                <div class="analysis-tab active" onclick="switchAnalysis('spectrogram')">
+                    <div class="tab-title spectrogram">
+                        <span>🔴</span> Spectrogram
+                    </div>
+                    <div class="tab-desc">Частотно-временной анализ</div>
+                </div>
+                <div class="analysis-tab" onclick="switchAnalysis('amplitude')">
+                    <div class="tab-title amplitude">
+                        <span>🔵</span> Amplitude Spectrum
+                    </div>
+                    <div class="tab-desc">Амплитудный спектр (FFT)</div>
+                </div>
+            </div>
+
+            <!-- Панель параметров -->
+            <div class="params-panel">
+                <div class="params-title">
+                    <span>⚙️</span> Параметры анализа
+                </div>
+                
+                <div class="param-row" id="windowSizeRow">
+                    <span class="param-label">Размер окна:</span>
+                    <input type="range" class="param-slider" id="windowSize" min="64" max="1024" step="64" value="256">
+                    <span class="param-value" id="windowSizeValue">256</span>
+                </div>
+                
+                <div class="param-row" id="overlapRow">
+                    <span class="param-label">Перекрытие:</span>
+                    <input type="range" class="param-slider" id="overlap" min="0" max="0.9" step="0.1" value="0.5">
+                    <span class="param-value" id="overlapValue">50%</span>
+                </div>
+            </div>
+
+            <!-- Кнопка генерации -->
+            <button class="generate-btn" id="generateBtn" disabled>
+                <span>🔮</span> Построить график
+            </button>
+
+            <!-- Индикатор загрузки -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div style="color: #94a3b8;">Анализ сигнала...</div>
+            </div>
+
+            <!-- Сообщение об ошибке -->
+            <div class="error-message" id="errorMessage"></div>
+
+            <!-- Результат для спектрограммы -->
+            <div class="result-area" id="spectrogramResult">
+                <img class="spectrogram-image" id="spectrogramImage" src="" alt="Спектрограмма">
+            </div>
+
+            <!-- Результат для амплитудного спектра -->
+            <div class="result-area" id="amplitudeResult">
+                <!-- Статистика -->
+                <div class="stats-grid">
+                    <div class="stat-card freq">
+                        <div class="stat-label">Основная частота</div>
+                        <div class="stat-value" id="fundamentalFreq">-<span class="stat-unit">Гц</span></div>
+                    </div>
+                    <div class="stat-card amp">
+                        <div class="stat-label">Макс. амплитуда</div>
+                        <div class="stat-value" id="maxAmplitude">-</div>
+                    </div>
+                    <div class="stat-card rate">
+                        <div class="stat-label">Частота дискр.</div>
+                        <div class="stat-value" id="samplingRate">-<span class="stat-unit">Гц</span></div>
+                    </div>
+                    <div class="stat-card length">
+                        <div class="stat-label">Длина сигнала</div>
+                        <div class="stat-value" id="signalLength">-</div>
+                    </div>
+                </div>
+                
+                <!-- Изображение спектра -->
+                <img class="spectrogram-image" id="amplitudeImage" src="" alt="Амплитудный спектр" style="margin-top: 20px;">
+                
+                <!-- Таблица пиков -->
+                <div class="peaks-table">
+                    <div class="peaks-title">
+                        <span>📊</span> Основные частотные компоненты
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Частота (Гц)</th>
+                                <th>Амплитуда</th>
+                            </tr>
+                        </thead>
+                        <tbody id="peaksBody">
+                            <tr><td colspan="3" style="text-align: center; color: #64748b;">Нет данных</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Лог как в осциллографе -->
+            <div class="log-panel">
+                <div class="log-header">
+                    <span>📋 Лог анализа</span>
+                    <button class="btn-secondary" onclick="clearLog()">Очистить</button>
+                </div>
+                <div class="log-container" id="log">
+                    <div class="log-entry">[SYSTEM] Инициализация анализатора...</div>
+                    <div class="log-entry">[SYSTEM] Загрузите файл для анализа</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Обновление времени
+        document.getElementById('liveTime').textContent = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+        setInterval(() => {
+            document.getElementById('liveTime').textContent = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+        }, 1000);
+
+        // Глобальные переменные
+        let currentFile = null;
+        let currentAnalysisType = 'spectrogram';
+
+        // Переключение между типами анализа
+        function switchAnalysis(type) {
+            currentAnalysisType = type;
+            
+            // Обновляем вкладки
+            document.querySelectorAll('.analysis-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.result-area').forEach(area => area.classList.remove('active'));
+            
+            if (type === 'spectrogram') {
+                document.querySelectorAll('.analysis-tab')[0].classList.add('active');
+                document.getElementById('spectrogramResult').classList.add('active');
+                document.getElementById('windowSizeRow').style.display = 'flex';
+                document.getElementById('overlapRow').style.display = 'flex';
+                addToLog('📊 Режим: спектрограмма');
+            } else {
+                document.querySelectorAll('.analysis-tab')[1].classList.add('active');
+                document.getElementById('amplitudeResult').classList.add('active');
+                document.getElementById('windowSizeRow').style.display = 'none';
+                document.getElementById('overlapRow').style.display = 'none';
+                addToLog('📈 Режим: амплитудный спектр');
+            }
+        }
+
+        // Загрузка файла
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+
+        async function handleFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showLoading();
+            hideError();
+            addToLog(`📁 Загрузка файла: ${file.name}`);
+
+            try {
+                const response = await fetch('/api/upload_signal', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentFile = data.filename;
+                    document.getElementById('fileName').textContent = data.filename;
+                    document.getElementById('filePoints').textContent = data.points;
+                    document.getElementById('fileDuration').textContent = data.duration.toFixed(2) + ' с';
+                    document.getElementById('fileInfo').classList.add('active');
+                    document.getElementById('generateBtn').disabled = false;
+                    document.getElementById('statusText').textContent = 'Файл загружен';
+                    document.getElementById('statusDot').className = 'status-dot';
+                    addToLog(`✅ Файл загружен: ${data.points} точек, ${data.duration.toFixed(2)} с`);
+                } else {
+                    showError(data.error);
+                    addToLog(`❌ Ошибка: ${data.error}`);
+                }
+            } catch (error) {
+                showError('Ошибка загрузки файла');
+                addToLog('❌ Ошибка загрузки файла');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Параметры
+        document.getElementById('windowSize').addEventListener('input', (e) => {
+            document.getElementById('windowSizeValue').textContent = e.target.value;
+        });
+
+        document.getElementById('overlap').addEventListener('input', (e) => {
+            document.getElementById('overlapValue').textContent = Math.round(e.target.value * 100) + '%';
+        });
+
+        // Генерация
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            showLoading();
+            hideError();
+            addToLog(`🔮 Запуск анализа...`);
+
+            try {
+                if (currentAnalysisType === 'spectrogram') {
+                    await generateSpectrogram();
+                } else {
+                    await generateAmplitudeSpectrum();
+                }
+            } catch (error) {
+                showError('Ошибка анализа');
+                addToLog('❌ Ошибка анализа');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        async function generateSpectrogram() {
+            const response = await fetch('/api/generate_spectrogram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: currentFile,
+                    window_size: parseInt(document.getElementById('windowSize').value),
+                    overlap: parseFloat(document.getElementById('overlap').value)
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('spectrogramImage').src = 'data:image/png;base64,' + data.image;
+                document.getElementById('spectrogramResult').classList.add('active');
+                addToLog('✅ Спектрограмма построена');
+            } else {
+                showError(data.error);
+                addToLog(`❌ Ошибка: ${data.error}`);
+            }
+        }
+
+        async function generateAmplitudeSpectrum() {
+            const response = await fetch('/api/amplitude_spectrum', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: currentFile
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Отображаем изображение
+                document.getElementById('amplitudeImage').src = 'data:image/png;base64,' + data.image;
+                document.getElementById('amplitudeResult').classList.add('active');
+                
+                // Обновляем статистику
+                document.getElementById('fundamentalFreq').innerHTML = data.fundamental_freq + '<span class="stat-unit">Гц</span>';
+                document.getElementById('maxAmplitude').textContent = data.max_amplitude;
+                document.getElementById('samplingRate').innerHTML = data.sampling_rate + '<span class="stat-unit">Гц</span>';
+                document.getElementById('signalLength').textContent = data.signal_length;
+                
+                // Обновляем таблицу пиков
+                const peaksBody = document.getElementById('peaksBody');
+                if (data.peaks && data.peaks.length > 0) {
+                    let html = '';
+                    data.peaks.forEach(peak => {
+                        html += `
+                            <tr>
+                                <td>${peak.number}</td>
+                                <td class="peak-freq">${peak.frequency}</td>
+                                <td class="peak-amp">${peak.amplitude}</td>
+                            </tr>
+                        `;
+                    });
+                    peaksBody.innerHTML = html;
+                    addToLog(`✅ Найдено ${data.peaks.length} частотных пиков`);
+                } else {
+                    peaksBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #64748b;">Пики не обнаружены</td></tr>';
+                    addToLog('⚠️ Пики не обнаружены');
+                }
+            } else {
+                showError(data.error);
+                addToLog(`❌ Ошибка: ${data.error}`);
+            }
+        }
+
+        // Вспомогательные функции
+        function showLoading() {
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('statusText').textContent = 'Анализ...';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+            document.getElementById('generateBtn').disabled = !currentFile;
+            document.getElementById('statusText').textContent = currentFile ? 'Файл загружен' : 'Ожидание файла';
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = 'Ошибка: ' + message;
+            errorEl.classList.add('active');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('active');
+        }
+
+        function addToLog(message) {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.insertBefore(entry, log.firstChild);
+            
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<div class="log-entry">[SYSTEM] Лог очищен</div>';
+            addToLog('🧹 Лог очищен');
+        }
+
+        // Инициализация
+        window.onload = () => {
+            addToLog('📊 Спектральный анализатор готов');
+            addToLog('💡 Загрузите CSV или TXT файл с сигналом');
+        };
+    </script>
+</body>
+</html>

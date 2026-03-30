@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Oscilloscope - 4 Channels</title>
+    <style>
+        /* Все стили остаются без изменений */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            width: 100%;
+        }
+
+        /* Новая навигационная панель */
+        .nav-bar {
+            background: #0a0f1e;
+            border-radius: 20px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-link {
+            padding: 10px 20px;
+            border-radius: 30px;
+            color: #94a3b8;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover {
+            background: #1e293b;
+            color: #e2e8f0;
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .time-display {
+            background: #1e293b;
+            padding: 8px 16px;
+            border-radius: 30px;
+            color: #3b82f6;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            border: 1px solid #3b82f6;
+        }
+
+        .oscilloscope-card {
+            background: #0a0f1e;
+            border-radius: 30px;
+            padding: 25px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 25px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            color: #94a3b8;
+        }
+
+        .title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .title h2 {
+            font-size: 24px;
+            font-weight: 400;
+            color: #e2e8f0;
+        }
+
+        .channel-indicators {
+            display: flex;
+            gap: 15px;
+            margin-left: 20px;
+        }
+
+        .channel-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .channel-badge.ch1 { background: rgba(255, 215, 0, 0.2); color: #FFD700; border: 1px solid #FFD700; }
+        .channel-badge.ch2 { background: rgba(255, 107, 107, 0.2); color: #FF6B6B; border: 1px solid #FF6B6B; }
+        .channel-badge.ch3 { background: rgba(78, 205, 196, 0.2); color: #4ECDC4; border: 1px solid #4ECDC4; }
+        .channel-badge.ch4 { background: rgba(192, 132, 252, 0.2); color: #C084FC; border: 1px solid #C084FC; }
+
+        .status {
+            background: #1e293b;
+            padding: 8px 16px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.paused {
+            background: #94a3b8;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .scope-container {
+            background: #030614;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #2d3a4f;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 500px;
+            display: block;
+            border-radius: 12px;
+            background: #0a0f1a;
+            cursor: crosshair;
+        }
+
+        .scale-panel {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid #334155;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .scale-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .scale-control:last-child {
+            margin-bottom: 0;
+        }
+
+        .scale-label {
+            color: #94a3b8;
+            font-size: 12px;
+            width: 60px;
+        }
+
+        .scale-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .scale-btn {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .scale-btn:hover {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+        }
+
+        .scale-value {
+            color: #3b82f6;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            min-width: 70px;
+            text-align: center;
+        }
+
+        .axis-labels {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            right: 30px;
+            bottom: 30px;
+            pointer-events: none;
+            color: #64748b;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .y-axis-label {
+            position: absolute;
+            left: -20px;
+            top: 50%;
+            transform: rotate(-90deg) translateX(-50%);
+            transform-origin: left;
+            color: #94a3b8;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        .x-axis-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #94a3b8;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        .mode-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: #1e293b;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #3b82f6;
+            border: 1px solid #3b82f6;
+        }
+
+        .channels-panel {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .channel-card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 15px;
+            border-left: 4px solid;
+            transition: all 0.3s;
+        }
+
+        .channel-card.ch1 { border-color: #FFD700; }
+        .channel-card.ch2 { border-color: #FF6B6B; }
+        .channel-card.ch3 { border-color: #4ECDC4; }
+        .channel-card.ch4 { border-color: #C084FC; }
+
+        .channel-card.disabled {
+            opacity: 0.5;
+            filter: grayscale(50%);
+        }
+
+        .channel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .channel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .channel-title.ch1 { color: #FFD700; }
+        .channel-title.ch2 { color: #FF6B6B; }
+        .channel-title.ch3 { color: #4ECDC4; }
+        .channel-title.ch4 { color: #C084FC; }
+
+        .channel-toggle {
+            width: 40px;
+            height: 20px;
+            background: #334155;
+            border-radius: 20px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .channel-toggle.active {
+            background: #22c55e;
+        }
+
+        .channel-toggle::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+
+        .channel-toggle.active::after {
+            left: 22px;
+        }
+
+        .channel-params {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .param-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .param-label {
+            color: #94a3b8;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .param-value {
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .param-value.small {
+            font-size: 12px;
+        }
+
+        .measurements {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 15px 20px;
+            margin-top: 15px;
+        }
+
+        .measure-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .measure-value {
+            color: #e2e8f0;
+            font-weight: 600;
+            font-size: 18px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .measure-unit {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .recording-panel {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 15px 20px;
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .record-btn {
+            background: #0f172a;
+            border: 2px solid #ef4444;
+            color: #ef4444;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .record-btn:hover {
+            background: #ef4444;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .record-btn.recording {
+            background: #ef4444;
+            color: white;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .channel-record-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .channel-record {
+            background: #0f172a;
+            border: 1px solid;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s;
+        }
+
+        .channel-record.ch1 { border-color: #FFD700; color: #FFD700; }
+        .channel-record.ch2 { border-color: #FF6B6B; color: #FF6B6B; }
+        .channel-record.ch3 { border-color: #4ECDC4; color: #4ECDC4; }
+        .channel-record.ch4 { border-color: #C084FC; color: #C084FC; }
+
+        .channel-record:hover {
+            filter: brightness(1.2);
+            transform: translateY(-2px);
+        }
+
+        .duration-select {
+            background: #0f172a;
+            border: 1px solid #3b82f6;
+            color: #e2e8f0;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .saved-files-mini {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .saved-file-mini {
+            background: #0f172a;
+            border-radius: 15px;
+            padding: 5px 10px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .saved-file-mini a {
+            color: #22c55e;
+            text-decoration: none;
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            color: #94a3b8;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select, input[type="range"] {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            padding: 10px 15px;
+            border-radius: 12px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            grid-column: span 2;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .log-panel {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 20px;
+            margin-top: 25px;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: #94a3b8;
+        }
+
+        .log-container {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #22c55e;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #334155;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Новая навигационная панель с ссылкой на спектрограмму -->
+        <div class="nav-bar">
+            <div class="nav-links">
+                <a href="/" class="nav-link active">
+                    <span>⚡</span> Осциллограф
+                </a>
+                <a href="/spectrogram" class="nav-link">
+                    <span>📊</span> Спектрограмма
+                </a>
+                <a href="#" class="nav-link" onclick="return false;" style="opacity: 0.5; cursor: not-allowed;">
+                    <span>📈</span> Анализатор (скоро)
+                </a>
+            </div>
+            <div class="time-display" id="liveTime">00:00:00</div>
+        </div>
+
+        <div class="oscilloscope-card">
+            <div class="header">
+                <div class="title">
+                    <span style="font-size: 32px;">⚡</span>
+                    <h2>Digital Oscilloscope DS-2026 <span style="font-size: 14px; color: #3b82f6; margin-left: 10px;">4 Channels</span></h2>
+                    <div class="channel-indicators">
+                        <div class="channel-badge ch1">CH1 ⚡</div>
+                        <div class="channel-badge ch2">CH2 ⚡</div>
+                        <div class="channel-badge ch3">CH3 ⚡</div>
+                        <div class="channel-badge ch4">CH4 ⚡</div>
+                    </div>
+                </div>
+                <div class="status">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Готов к работе</span>
+                </div>
+            </div>
+
+            <div class="scope-container">
+                <canvas id="oscilloscope"></canvas>
+                
+                <div class="scale-panel">
+                    <div class="scale-control">
+                        <span class="scale-label">Time/Div</span>
+                        <div class="scale-buttons">
+                            <button class="scale-btn" onclick="adjustTimeScale(-1)">−</button>
+                            <span class="scale-value" id="timeScaleValue">0.2 с</span>
+                            <button class="scale-btn" onclick="adjustTimeScale(1)">+</button>
+                        </div>
+                    </div>
+                    <div class="scale-control">
+                        <span class="scale-label">Volt/Div</span>
+                        <div class="scale-buttons">
+                            <button class="scale-btn" onclick="adjustVoltScale(-1)">−</button>
+                            <span class="scale-value" id="voltScaleValue">1.0 V</span>
+                            <button class="scale-btn" onclick="adjustVoltScale(1)">+</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="axis-labels">
+                    <div class="y-axis-label">НАПРЯЖЕНИЕ (V)</div>
+                    <div class="x-axis-label">ВРЕМЯ (с)</div>
+                </div>
+                
+                <div class="mode-indicator" id="modeIndicator">
+                    ⏺ 4 канала • Активно
+                </div>
+            </div>
+
+            <!-- Панель каналов -->
+            <div class="channels-panel" id="channelsPanel">
+                <div class="channel-card ch1" id="channel1">
+                    <div class="channel-header">
+                        <div class="channel-title ch1">
+                            <span>🟡 CH1</span>
+                        </div>
+                        <div class="channel-toggle active" id="toggle1" onclick="toggleChannel('ch1')"></div>
+                    </div>
+                    <div class="channel-params">
+                        <div class="param-item">
+                            <span class="param-label">Тип</span>
+                            <span class="param-value" id="ch1_type">Синус</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Частота</span>
+                            <span class="param-value" id="ch1_freq">30.0 Гц</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Амплитуда</span>
+                            <span class="param-value" id="ch1_amp">5.0 V</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Смещение</span>
+                            <span class="param-value" id="ch1_offset">0.0 V</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="channel-card ch2" id="channel2">
+                    <div class="channel-header">
+                        <div class="channel-title ch2">
+                            <span>🔴 CH2</span>
+                        </div>
+                        <div class="channel-toggle active" id="toggle2" onclick="toggleChannel('ch2')"></div>
+                    </div>
+                    <div class="channel-params">
+                        <div class="param-item">
+                            <span class="param-label">Тип</span>
+                            <span class="param-value" id="ch2_type">Меандр</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Частота</span>
+                            <span class="param-value" id="ch2_freq">2.0 Гц</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Амплитуда</span>
+                            <span class="param-value" id="ch2_amp">3.0 V</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Смещение</span>
+                            <span class="param-value" id="ch2_offset">+2.0 V</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="channel-card ch3" id="channel3">
+                    <div class="channel-header">
+                        <div class="channel-title ch3">
+                            <span>🔵 CH3</span>
+                        </div>
+                        <div class="channel-toggle active" id="toggle3" onclick="toggleChannel('ch3')"></div>
+                    </div>
+                    <div class="channel-params">
+                        <div class="param-item">
+                            <span class="param-label">Тип</span>
+                            <span class="param-value" id="ch3_type">Треугольный</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Частота</span>
+                            <span class="param-value" id="ch3_freq">2.5 Гц</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Амплитуда</span>
+                            <span class="param-value" id="ch3_amp">4.0 V</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Смещение</span>
+                            <span class="param-value" id="ch3_offset">-2.0 V</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="channel-card ch4" id="channel4">
+                    <div class="channel-header">
+                        <div class="channel-title ch4">
+                            <span>🟣 CH4</span>
+                        </div>
+                        <div class="channel-toggle active" id="toggle4" onclick="toggleChannel('ch4')"></div>
+                    </div>
+                    <div class="channel-params">
+                        <div class="param-item">
+                            <span class="param-label">Тип</span>
+                            <span class="param-value" id="ch4_type">Пилообразный</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Частота</span>
+                            <span class="param-value" id="ch4_freq">3.0 Гц</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Амплитуда</span>
+                            <span class="param-value" id="ch4_amp">2.5 V</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Смещение</span>
+                            <span class="param-value" id="ch4_offset">+1.0 V</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель записи -->
+            <div class="recording-panel">
+                <div class="record-btn" id="recordBtn" onclick="startRecording()">
+                    <span>⏺</span> Записать все
+                </div>
+                
+                <div class="channel-record-btns">
+                    <div class="channel-record ch1" onclick="saveChannel('ch1')">
+                        <span>🟡</span> CH1
+                    </div>
+                    <div class="channel-record ch2" onclick="saveChannel('ch2')">
+                        <span>🔴</span> CH2
+                    </div>
+                    <div class="channel-record ch3" onclick="saveChannel('ch3')">
+                        <span>🔵</span> CH3
+                    </div>
+                    <div class="channel-record ch4" onclick="saveChannel('ch4')">
+                        <span>🟣</span> CH4
+                    </div>
+                </div>
+
+                <select class="duration-select" id="saveDuration">
+                    <option value="5">5 сек</option>
+                    <option value="10" selected>10 сек</option>
+                    <option value="30">30 сек</option>
+                    <option value="60">60 сек</option>
+                </select>
+
+                <div class="saved-files-mini" id="savedFilesMini">
+                    <!-- Сюда будут подгружаться последние записи -->
+                </div>
+            </div>
+
+            <div class="measurements">
+                <div class="measure-item">
+                    <span style="color: #FFD700;">●</span>
+                    <span class="measure-value" id="ch1_current">0.00</span>
+                    <span class="measure-unit">V</span>
+                </div>
+                <div class="measure-item">
+                    <span style="color: #FF6B6B;">●</span>
+                    <span class="measure-value" id="ch2_current">0.00</span>
+                    <span class="measure-unit">V</span>
+                </div>
+                <div class="measure-item">
+                    <span style="color: #4ECDC4;">●</span>
+                    <span class="measure-value" id="ch3_current">0.00</span>
+                    <span class="measure-unit">V</span>
+                </div>
+                <div class="measure-item">
+                    <span style="color: #C084FC;">●</span>
+                    <span class="measure-value" id="ch4_current">0.00</span>
+                    <span class="measure-unit">V</span>
+                </div>
+                <div class="measure-item">
+                    <span>⏱️ Время</span>
+                    <span class="measure-value" id="currentTime">0.00</span>
+                    <span class="measure-unit">с</span>
+                </div>
+                <div class="measure-item">
+                    <span>💾 Буфер</span>
+                    <span class="measure-value" id="bufferSize">0</span>
+                    <span class="measure-unit">точек</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="button-group">
+                <button class="btn btn-start" id="startBtn" onclick="startGeneration()">
+                    <span>▶</span> Старт
+                </button>
+                <button class="btn btn-stop" id="stopBtn" onclick="stopGeneration()" disabled>
+                    <span>⏹</span> Стоп
+                </button>
+                <button class="btn btn-primary" onclick="applyAllSettings()">
+                    <span>💾</span> Применить все
+                </button>
+                <button class="btn btn-secondary" onclick="resetSystem()">
+                    <span>🔄</span> Сброс
+                </button>
+            </div>
+        </div>
+
+        <div class="log-panel">
+            <div class="log-header">
+                <span>📋 Лог данных</span>
+                <button class="btn btn-secondary" style="padding: 6px 12px;" onclick="clearLog()">Очистить</button>
+            </div>
+            <div class="log-container" id="log">
+                <div class="log-entry">[SYSTEM] Инициализация осциллографа...</div>
+                <div class="log-entry">[SYSTEM] 4 канала активны</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Обновляем время в навбаре
+        document.getElementById('liveTime').textContent = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+        setInterval(() => {
+            document.getElementById('liveTime').textContent = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+        }, 1000);
+
+        // Глобальные переменные
+        let stopClickCount = 0;
+        let lastStopTime = 0;
+        let isGenerating = false;
+        let animationFrame;
+        let lastFetchTime = 0;
+        let isRecording = false;
+        let dataFetchInterval = null;
+
+        class OscilloscopeRenderer {
+            constructor(canvasId, maxBufferSize = 5000) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.data = { ch1: [], ch2: [], ch3: [], ch4: [] };
+                this.maxBufferSize = maxBufferSize;
+                this.width = 0;
+                this.height = 0;
+                this.enabledChannels = { ch1: true, ch2: true, ch3: true, ch4: true };
+                
+                this.colors = {
+                    ch1: '#FFD700',
+                    ch2: '#FF6B6B',
+                    ch3: '#4ECDC4',
+                    ch4: '#C084FC'
+                };
+                
+                this.timeScale = 0.2;
+                this.voltScale = 1.0;
+                
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+            }
+
+            resize() {
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.width = rect.width;
+                this.height = 500;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+                this.draw();
+            }
+
+            toggleChannel(ch) {
+                this.enabledChannels[ch] = !this.enabledChannels[ch];
+                this.draw();
+            }
+
+            updateData(newData) {
+                for (let ch of ['ch1', 'ch2', 'ch3', 'ch4']) {
+                    if (newData[ch] && newData[ch].length > 0) {
+                        this.data[ch] = newData[ch];
+                    }
+                }
+                this.draw();
+            }
+
+            clear() {
+                this.data = { ch1: [], ch2: [], ch3: [], ch4: [] };
+                this.draw();
+            }
+
+            setTimeScale(delta) {
+                const scales = [0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0];
+                let index = scales.indexOf(this.timeScale);
+                if (delta > 0 && index < scales.length - 1) {
+                    this.timeScale = scales[index + 1];
+                } else if (delta < 0 && index > 0) {
+                    this.timeScale = scales[index - 1];
+                }
+                document.getElementById('timeScaleValue').textContent = this.timeScale.toFixed(2) + ' с';
+                this.draw();
+            }
+
+            setVoltScale(delta) {
+                const scales = [0.2, 0.5, 1.0, 2.0, 5.0];
+                let index = scales.indexOf(this.voltScale);
+                if (delta > 0 && index < scales.length - 1) {
+                    this.voltScale = scales[index + 1];
+                } else if (delta < 0 && index > 0) {
+                    this.voltScale = scales[index - 1];
+                }
+                document.getElementById('voltScaleValue').textContent = this.voltScale.toFixed(1) + ' V';
+                this.draw();
+            }
+
+            drawGrid() {
+                const ctx = this.ctx;
+                const w = this.width;
+                const h = this.height;
+                const timePerDiv = this.timeScale;
+                const voltPerDiv = this.voltScale;
+
+                ctx.fillStyle = '#0a0f1a';
+                ctx.fillRect(0, 0, w, h);
+
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 0.5;
+
+                for (let i = 0; i <= 10; i++) {
+                    const x = (i / 10) * w;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, h);
+                    ctx.stroke();
+                }
+
+                for (let i = 0; i <= 8; i++) {
+                    const y = (i / 8) * h;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(w, y);
+                    ctx.stroke();
+                    
+                    const voltage = (4 - i) * voltPerDiv;
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '12px JetBrains Mono';
+                    ctx.fillText(voltage.toFixed(1) + 'V', 5, y - 5);
+                }
+
+                const zeroY = h / 2;
+                ctx.beginPath();
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(0, zeroY);
+                ctx.lineTo(w, zeroY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            drawChannel(ch, data) {
+                if (!this.enabledChannels[ch] || data.length < 2) return;
+
+                const ctx = this.ctx;
+                const w = this.width;
+                const h = this.height;
+                const timePerDiv = this.timeScale;
+                const voltPerDiv = this.voltScale;
+                const timeWindow = timePerDiv * 10;
+                
+                const lastT = data[data.length - 1].t;
+                const startT = Math.max(0, lastT - timeWindow);
+                const visibleData = data.filter(d => d.t >= startT);
+
+                if (visibleData.length < 2) return;
+
+                ctx.beginPath();
+                ctx.strokeStyle = this.colors[ch];
+                ctx.lineWidth = 2;
+                ctx.shadowColor = this.colors[ch];
+                ctx.shadowBlur = 10;
+
+                for (let i = 0; i < visibleData.length; i++) {
+                    const t = visibleData[i].t - startT;
+                    const x = (t / timeWindow) * w;
+                    const y = h/2 - (visibleData[i].value / (voltPerDiv * 4)) * (h/2);
+
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+
+                ctx.stroke();
+                
+                if (visibleData.length > 0) {
+                    const lastPoint = visibleData[visibleData.length - 1];
+                    const lastX = w;
+                    const lastY = h/2 - (lastPoint.value / (voltPerDiv * 4)) * (h/2);
+                    
+                    ctx.beginPath();
+                    ctx.fillStyle = this.colors[ch];
+                    ctx.shadowBlur = 15;
+                    ctx.arc(lastX, lastY, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                
+                ctx.shadowBlur = 0;
+            }
+
+            draw() {
+                this.drawGrid();
+                
+                this.drawChannel('ch1', this.data.ch1);
+                this.drawChannel('ch2', this.data.ch2);
+                this.drawChannel('ch3', this.data.ch3);
+                this.drawChannel('ch4', this.data.ch4);
+                
+                const ctx = this.ctx;
+                const w = this.width;
+                const h = this.height;
+                const timePerDiv = this.timeScale;
+                
+                let lastT = 0;
+                for (let ch of ['ch1', 'ch2', 'ch3', 'ch4']) {
+                    if (this.data[ch].length > 0) {
+                        lastT = Math.max(lastT, this.data[ch][this.data[ch].length - 1].t);
+                    }
+                }
+                
+                const startT = Math.max(0, lastT - timePerDiv * 10);
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '12px JetBrains Mono';
+                for (let i = 0; i <= 10; i++) {
+                    const x = (i / 10) * w;
+                    const time = startT + i * timePerDiv;
+                    ctx.fillText(time.toFixed(1) + 'с', x + 5, h - 5);
+                }
+            }
+        }
+
+        const scope = new OscilloscopeRenderer('oscilloscope', 5000);
+
+        // Функции управления масштабом
+        function adjustTimeScale(delta) {
+            scope.setTimeScale(delta);
+        }
+
+        function adjustVoltScale(delta) {
+            scope.setVoltScale(delta);
+        }
+
+        // Функция переключения каналов
+        async function toggleChannel(ch) {
+            try {
+                const response = await fetch(`/api/channel/${ch}/toggle`, { method: 'POST' });
+                const data = await response.json();
+                
+                const toggle = document.getElementById(`toggle${ch[2]}`);
+                const card = document.getElementById(`channel${ch[2]}`);
+                
+                if (data.enabled) {
+                    toggle.classList.add('active');
+                    card.classList.remove('disabled');
+                } else {
+                    toggle.classList.remove('active');
+                    card.classList.add('disabled');
+                }
+                
+                scope.toggleChannel(ch);
+                addToLog(`Канал ${ch.toUpperCase()} ${data.enabled ? 'включен' : 'отключен'}`);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Функция получения данных
+        async function fetchData() {
+            if (!isGenerating) return;
+            
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                scope.updateData(data);
+                
+                if (data.ch1.length > 0) {
+                    document.getElementById('ch1_current').textContent = data.ch1[data.ch1.length - 1].value.toFixed(3);
+                }
+                if (data.ch2.length > 0) {
+                    document.getElementById('ch2_current').textContent = data.ch2[data.ch2.length - 1].value.toFixed(3);
+                }
+                if (data.ch3.length > 0) {
+                    document.getElementById('ch3_current').textContent = data.ch3[data.ch3.length - 1].value.toFixed(3);
+                }
+                if (data.ch4.length > 0) {
+                    document.getElementById('ch4_current').textContent = data.ch4[data.ch4.length - 1].value.toFixed(3);
+                }
+                
+                const allData = [...data.ch1, ...data.ch2, ...data.ch3, ...data.ch4];
+                if (allData.length > 0) {
+                    document.getElementById('currentTime').textContent = allData[allData.length - 1].t.toFixed(2);
+                }
+                document.getElementById('bufferSize').textContent = allData.length;
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        function startDataFetching() {
+            if (dataFetchInterval) {
+                clearInterval(dataFetchInterval);
+            }
+            dataFetchInterval = setInterval(() => {
+                if (isGenerating) {
+                    fetchData();
+                }
+            }, 50);
+        }
+
+        function stopDataFetching() {
+            if (dataFetchInterval) {
+                clearInterval(dataFetchInterval);
+                dataFetchInterval = null;
+            }
+        }
+
+        async function startGeneration() {
+            try {
+                stopClickCount = 0;
+                
+                document.getElementById('stopBtn').innerHTML = '<span>⏹</span> Стоп';
+                
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({force_reset: false})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    isGenerating = true;
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    
+                    startDataFetching();
+                    
+                    if (data.time_reset) {
+                        document.getElementById('statusText').textContent = 'Генерация (время сброшено)';
+                        addToLog('🔄 Автоматический сброс времени');
+                    } else {
+                        document.getElementById('statusText').textContent = 'Генерация сигнала';
+                    }
+                    
+                    document.getElementById('statusDot').className = 'status-dot';
+                    document.getElementById('modeIndicator').innerHTML = '⏺ 4 канала • Активно';
+                    addToLog('▶️ Генерация запущена');
+                    
+                    updateTimeInfo();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function stopGeneration() {
+            try {
+                stopClickCount++;
+                
+                let resetMode = 'normal';
+                let buttonText = 'Стоп';
+                
+                if (stopClickCount === 1) {
+                    resetMode = 'normal';
+                    buttonText = '⏸️ Пауза';
+                } else if (stopClickCount === 2) {
+                    resetMode = 'time_reset';
+                    buttonText = '⏱️ Сброс времени';
+                } else if (stopClickCount >= 3) {
+                    resetMode = 'full_reset';
+                    buttonText = '🔄 Полный сброс';
+                    stopClickCount = 0;
+                }
+                
+                const stopBtn = document.getElementById('stopBtn');
+                stopBtn.innerHTML = `<span>⏹</span> ${buttonText}`;
+                
+                isGenerating = false;
+                stopDataFetching();
+                
+                const response = await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({reset_mode: resetMode})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    
+                    let statusText = 'Остановлено';
+                    let modeText = '⏸ Пауза';
+                    
+                    if (data.reset_type === 'full') {
+                        statusText = 'Полный сброс';
+                        modeText = '🔄 Сброс';
+                        addToLog('🔄 Выполнен полный сброс системы');
+                        
+                        document.getElementById('ch1_current').textContent = '0.00';
+                        document.getElementById('ch2_current').textContent = '0.00';
+                        document.getElementById('ch3_current').textContent = '0.00';
+                        document.getElementById('ch4_current').textContent = '0.00';
+                        
+                        scope.clear();
+                        
+                    } else if (data.reset_type === 'time') {
+                        statusText = 'Время сброшено';
+                        modeText = '⏱️ Сброс времени';
+                        addToLog('⏱️ Виртуальное время сброшено');
+                    } else {
+                        statusText = `Пауза #${data.pause_count || 1}`;
+                        modeText = '⏸ Пауза';
+                        addToLog(`⏸️ Пауза #${data.pause_count || 1}`);
+                        
+                        if (data.warning) {
+                            addToLog(`⚠️ ${data.warning}`);
+                        }
+                    }
+                    
+                    document.getElementById('statusText').textContent = statusText;
+                    document.getElementById('statusDot').className = 'status-dot paused';
+                    document.getElementById('modeIndicator').innerHTML = `⏸ ${modeText}`;
+                    
+                    updateTimeInfo();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addToLog('❌ Ошибка при остановке');
+                isGenerating = false;
+                stopDataFetching();
+            }
+        }
+
+        async function updateTimeInfo() {
+            try {
+                const response = await fetch('/api/time_info');
+                const info = await response.json();
+                
+                const stopBtn = document.getElementById('stopBtn');
+                let tooltip = '';
+                if (info.pause_count === 0) {
+                    tooltip = 'Нажмите для паузы';
+                } else if (info.pause_count === 1) {
+                    tooltip = 'Ещё раз для сброса времени';
+                } else if (info.pause_count >= 2) {
+                    tooltip = 'Ещё раз для полного сброса';
+                }
+                stopBtn.title = tooltip;
+                
+            } catch (error) {
+                console.error('Error getting time info:', error);
+            }
+        }
+
+        async function saveChannel(channel) {
+            const duration = document.getElementById('saveDuration').value;
+            
+            try {
+                const response = await fetch(`/api/save_channel/${channel}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({duration: parseInt(duration)})
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToLog(`✅ Канал ${channel} сохранен: ${data.filename}`);
+                    refreshSavedFilesMini();
+                } else {
+                    addToLog(`❌ Ошибка: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error saving channel:', error);
+            }
+        }
+
+        async function startRecording() {
+            if (!isGenerating) {
+                addToLog('⚠️ Сначала запустите генерацию');
+                return;
+            }
+            
+            isRecording = true;
+            document.getElementById('recordBtn').classList.add('recording');
+            document.getElementById('recordBtn').innerHTML = '<span>⏺</span> Запись...';
+            
+            await saveChannel('ch1');
+            await saveChannel('ch2');
+            await saveChannel('ch3');
+            await saveChannel('ch4');
+            
+            isRecording = false;
+            document.getElementById('recordBtn').classList.remove('recording');
+            document.getElementById('recordBtn').innerHTML = '<span>⏺</span> Записать все';
+            
+            addToLog('📝 Запись всех каналов завершена');
+        }
+
+        async function refreshSavedFilesMini() {
+            try {
+                const response = await fetch('/api/list_saved');
+                const files = await response.json();
+                
+                const container = document.getElementById('savedFilesMini');
+                container.innerHTML = '';
+                
+                files.slice(0, 3).forEach(file => {
+                    const fileEl = document.createElement('div');
+                    fileEl.className = 'saved-file-mini';
+                    fileEl.innerHTML = `
+                        <span>📄</span>
+                        <a href="/api/download/${file.name}" download>${file.name}</a>
+                        <span>${file.size}KB</span>
+                    `;
+                    container.appendChild(fileEl);
+                });
+            } catch (error) {
+                console.error('Error refreshing files:', error);
+            }
+        }
+
+        async function applyAllSettings() {
+            addToLog('Настройки применены');
+        }
+
+        async function resetSystem() {
+            try {
+                if (isGenerating) {
+                    isGenerating = false;
+                    stopDataFetching();
+                }
+                
+                await fetch('/api/clear_buffer', { method: 'POST' });
+                scope.clear();
+                addToLog('Система сброшена');
+                
+                document.getElementById('ch1_current').textContent = '0.00';
+                document.getElementById('ch2_current').textContent = '0.00';
+                document.getElementById('ch3_current').textContent = '0.00';
+                document.getElementById('ch4_current').textContent = '0.00';
+                document.getElementById('currentTime').textContent = '0.00';
+                document.getElementById('bufferSize').textContent = '0';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function addToLog(message) {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.insertBefore(entry, log.firstChild);
+            
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<div class="log-entry">[SYSTEM] Лог очищен</div>';
+        }
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                document.getElementById('ch1_type').textContent = getSignalTypeName(config.ch1.type);
+                document.getElementById('ch1_freq').textContent = config.ch1.frequency.toFixed(1) + ' Гц';
+                document.getElementById('ch1_amp').textContent = config.ch1.amplitude.toFixed(1) + ' V';
+                document.getElementById('ch1_offset').textContent = config.ch1.offset.toFixed(1) + ' V';
+                
+                document.getElementById('ch2_type').textContent = getSignalTypeName(config.ch2.type);
+                document.getElementById('ch2_freq').textContent = config.ch2.frequency.toFixed(1) + ' Гц';
+                document.getElementById('ch2_amp').textContent = config.ch2.amplitude.toFixed(1) + ' V';
+                document.getElementById('ch2_offset').textContent = (config.ch2.offset > 0 ? '+' : '') + config.ch2.offset.toFixed(1) + ' V';
+                
+                document.getElementById('ch3_type').textContent = getSignalTypeName(config.ch3.type);
+                document.getElementById('ch3_freq').textContent = config.ch3.frequency.toFixed(1) + ' Гц';
+                document.getElementById('ch3_amp').textContent = config.ch3.amplitude.toFixed(1) + ' V';
+                document.getElementById('ch3_offset').textContent = (config.ch3.offset > 0 ? '+' : '') + config.ch3.offset.toFixed(1) + ' V';
+                
+                document.getElementById('ch4_type').textContent = getSignalTypeName(config.ch4.type);
+                document.getElementById('ch4_freq').textContent = config.ch4.frequency.toFixed(1) + ' Гц';
+                document.getElementById('ch4_amp').textContent = config.ch4.amplitude.toFixed(1) + ' V';
+                document.getElementById('ch4_offset').textContent = (config.ch4.offset > 0 ? '+' : '') + config.ch4.offset.toFixed(1) + ' V';
+                
+            } catch (error) {
+                console.error('Error loading config:', error);
+            }
+        }
+
+        function getSignalTypeName(type) {
+            const names = {
+                'sine': 'Синус',
+                'square': 'Меандр',
+                'triangle': 'Треугольный',
+                'sawtooth': 'Пилообразный',
+                'noise': 'Шум',
+                'composite': 'Составной'
+            };
+            return names[type] || type;
+        }
+
+        window.onload = () => {
+            loadConfig();
+            refreshSavedFilesMini();
+            updateTimeInfo();
+            addToLog('Система готова к работе');
+            addToLog('Режим: 4 канала с умным управлением временем');
+            addToLog('⏱️ Стоп: 1×пауза, 2×сброс времени, 3×полный сброс');
+            addToLog('📊 Спектрограмма доступна в навбаре');
+        };
+
+        window.onbeforeunload = () => {
+            if (dataFetchInterval) {
+                clearInterval(dataFetchInterval);
+            }
+        };
+
+        setInterval(() => {
+            if (!isGenerating) {
+                updateTimeInfo();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
