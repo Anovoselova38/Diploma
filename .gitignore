@@ -1,3 +1,4 @@
-Since the only added files are `.gitignore` and `README.md` (both of which are source/config files), and there are no build artifacts, dependencies, or temporary files in the change list, no additional ignore rules are needed.
-
-The current `.gitignore` is empty, and no new rules need to be added based on the provided file changes.
+```
+__pycache__/
+*.pyc
+```
